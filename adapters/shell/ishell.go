@@ -9,17 +9,14 @@ import (
 
 type Shell struct {
 	service *app.IpfsService
-	i       *ishell.Shell
+	Ish     *ishell.Shell
 }
 
-func New(s *app.IpfsService) *Shell {
-	return &Shell{service: s}
-}
+func (sh *Shell) Init(s *app.IpfsService) {
+	sh.Ish.Println("Shell started")
+	sh.service = s
 
-func (sh *Shell) Init() {
-	sh.i = ishell.New()
-	sh.i.Println("Shell started")
-	sh.i.AddCmd(&ishell.Cmd{Name: "add", Help: "add a file to ipfs", Func: func(c *ishell.Context) {
+	sh.Ish.AddCmd(&ishell.Cmd{Name: "add", Help: "add a file to ipfs", Func: func(c *ishell.Context) {
 		filename := c.Args[0]
 		filepath := "./" + filename
 		cid, err := sh.service.AddFile(filepath)
@@ -30,7 +27,7 @@ func (sh *Shell) Init() {
 		c.Printf("filed added with cid: %s\n", cid)
 	}})
 
-	sh.i.AddCmd(&ishell.Cmd{Name: "get", Help: "get a file from ipfs", Func: func(c *ishell.Context) {
+	sh.Ish.AddCmd(&ishell.Cmd{Name: "get", Help: "get a file from ipfs", Func: func(c *ishell.Context) {
 		cidStr := c.Args[0]
 		err := sh.service.GetFile(cidStr)
 		if err != nil {
@@ -40,7 +37,7 @@ func (sh *Shell) Init() {
 		c.Printf("file written successfully\n")
 	}})
 
-	sh.i.AddCmd(&ishell.Cmd{Name: "connect", Help: "connect to a peer", Func: func(c *ishell.Context) {
+	sh.Ish.AddCmd(&ishell.Cmd{Name: "connect", Help: "connect to a peer", Func: func(c *ishell.Context) {
 		addrStr := c.Args[0]
 		err := sh.service.Connect(addrStr)
 		if err != nil {
@@ -49,5 +46,6 @@ func (sh *Shell) Init() {
 		}
 		c.Printf("connected to %s\n", addrStr)
 	}})
-	sh.i.Run()
+
+	sh.Ish.Run()
 }

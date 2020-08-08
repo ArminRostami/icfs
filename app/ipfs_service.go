@@ -24,18 +24,34 @@ import (
 )
 
 type IpfsService struct {
-	ctx  context.Context
-	ipfs icore.CoreAPI
+	repoPath string
+	ctx      context.Context
+	ipfs     icore.CoreAPI
 }
 
-func NewIpfsService() (context.CancelFunc, *IpfsService, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	ipfs, err := spawnDefault(ctx)
+func NewService() (context.CancelFunc, *IpfsService, error) {
+	pr, err := config.PathRoot()
 	if err != nil {
-		cancel()
-		return nil, nil, errors.Wrap(err, "failed to spawn default node")
+		return nil, nil, errors.Wrap(err, "failed to get default config path")
 	}
-	return cancel, &IpfsService{ctx: ctx, ipfs: ipfs}, nil
+	if err := setupPlugins(pr); err != nil {
+		return nil, nil, errors.Wrap(err, "failed to setup plugins")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	return cancel, &IpfsService{ctx: ctx, repoPath: pr}, nil
+}
+
+func (s *IpfsService) StartService() error {
+	ipfs, err := createNode(s.ctx, s.repoPath)
+	if err != nil {
+		return errors.Wrap(err, "failed to spawn default node")
+	}
+	s.ipfs = ipfs
+	return nil
+}
+
+func (s *IpfsService) RepoExists() bool {
+	return fsrepo.IsInitialized(s.repoPath)
 }
 
 func (s *IpfsService) AddFile(filepath string) (string, error) {
@@ -65,18 +81,42 @@ func (s *IpfsService) GetFile(cidStr string) error {
 }
 
 func (s *IpfsService) Connect(addrStr string) error {
-	maddr, err := ma.NewMultiaddr(addrStr)
+	peerAddr, err := getAddrInfoFromStr(addrStr)
 	if err != nil {
-		return errors.Wrap(err, "failed to create multiaddr from address string")
-	}
-	peerAddr, err := peer.AddrInfoFromP2pAddr(maddr)
-	if err != nil {
-		return errors.Wrap(err, "failed to create addinfo from multiaddr")
+		return errors.Wrap(err, "failed to get addrInfo")
 	}
 	err = s.ipfs.Swarm().Connect(s.ctx, *peerAddr)
 	if err != nil {
 		return errors.Wrap(err, "failed to connect to peer")
 	}
+	return nil
+}
+
+func (s *IpfsService) SetupRepo(bootStr string) error {
+	fmt.Printf("setting up new repo at %s\n", s.repoPath)
+
+	cfg, err := config.Init(ioutil.Discard, 2048)
+	if err != nil {
+		return errors.Wrap(err, "failed to init config")
+	}
+
+	boot, err := getAddrInfoFromStr(bootStr)
+	if err != nil {
+		fmt.Println("failed to get addrInfo; using no bootstrappers...")
+		cfg.SetBootstrapPeers(nil)
+	} else {
+		cfg.SetBootstrapPeers([]peer.AddrInfo{*boot})
+	}
+
+	if err = fsrepo.Init(s.repoPath, cfg); err != nil {
+		return errors.Wrap(err, "failed to init repo")
+	}
+
+	err = writeKey(swKey, path.Join(s.repoPath, "swarm.key"))
+	if err != nil {
+		return errors.Wrap(err, "failed to copy swarm.key file")
+	}
+
 	return nil
 }
 
@@ -130,35 +170,16 @@ func writeKey(key, dst string) error {
 	return nil
 }
 
-func setupRepo(repoPath string) error {
-	fmt.Printf("setting up new repo at %s\n", repoPath)
-
-	if err := setupPlugins(repoPath); err != nil {
-		return errors.Wrap(err, "failed to setup plugins")
-	}
-
-	if fsrepo.IsInitialized(repoPath) {
-		fmt.Println("repo is already initialized. skipping...")
-		return nil
-	}
-
-	cfg, err := config.Init(ioutil.Discard, 2048)
+func getAddrInfoFromStr(addrStr string) (*peer.AddrInfo, error) {
+	maddr, err := ma.NewMultiaddr(addrStr)
 	if err != nil {
-		return errors.Wrap(err, "failed to init config")
+		return nil, errors.Wrap(err, "failed to create multiaddr from address string")
 	}
-	cfg.SetBootstrapPeers(nil)
-
-	if err = fsrepo.Init(repoPath, cfg); err != nil {
-		return errors.Wrap(err, "failed to init repo")
-	}
-
-	// err = copy(path.Join(".", "swarm.key"), path.Join(repoPath, "swarm.key"))
-	err = writeKey(swKey, path.Join(repoPath, "swarm.key"))
+	peerAddr, err := peer.AddrInfoFromP2pAddr(maddr)
 	if err != nil {
-		return errors.Wrap(err, "failed to copy swarm.key file")
+		return nil, errors.Wrap(err, "failed to create addrInfo from multiAddr")
 	}
-
-	return nil
+	return peerAddr, nil
 }
 
 func getUnixfsNode(path string) (files.Node, error) {
@@ -173,18 +194,4 @@ func getUnixfsNode(path string) (files.Node, error) {
 	}
 
 	return f, nil
-}
-
-func spawnDefault(ctx context.Context) (icore.CoreAPI, error) {
-	path, err := config.PathRoot()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get default path")
-	}
-
-	err = setupRepo(path)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to setup repo")
-	}
-
-	return createNode(ctx, path)
 }

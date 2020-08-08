@@ -124,6 +124,10 @@ func (s *IpfsService) SetupRepo(bootStr string) error {
 	return nil
 }
 
+func GetBootstrapString(ip, id string) string {
+	return fmt.Sprintf("/ip4/%s/tcp/4001/ipfs/%s", ip, id)
+}
+
 func setupPlugins(externalPluginsPath string) error {
 	// Load any external plugins if available on externalPluginsPath
 	plugins, err := loader.NewPluginLoader(filepath.Join(externalPluginsPath, "plugins"))

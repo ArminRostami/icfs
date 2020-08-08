@@ -19,12 +19,11 @@ func run() error {
 	sh := &shell.Shell{Ish: ishell.New()}
 
 	if !ipfsService.RepoExists() {
-		sh.Ish.Println("enter bootstrap address")
-		bootStr, err := sh.Ish.ReadLineErr()
-		if err != nil {
-			return errors.Wrap(err, "failed to readline from console")
-		}
-		err = ipfsService.SetupRepo(bootStr)
+		sh.Ish.Println("enter bootstrap ip:")
+		ip := sh.Ish.ReadLine()
+		sh.Ish.Println("enter bootstrap id:")
+		id := sh.Ish.ReadLine()
+		err = ipfsService.SetupRepo(app.GetBootstrapString(ip, id))
 		if err != nil {
 			return errors.Wrap(err, "failed to setup repo on default path")
 		}

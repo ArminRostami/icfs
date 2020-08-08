@@ -47,5 +47,9 @@ func (sh *Shell) Init(s *app.IpfsService) {
 		c.Printf("connected to %s\n", addrStr)
 	}})
 
+	sh.Ish.AddCmd(&ishell.Cmd{Name: "path", Help: "returns ipfs repo path", Func: func(c *ishell.Context) {
+		c.Println(sh.service.GetRepoPath())
+	}})
+
 	sh.Ish.Run()
 }

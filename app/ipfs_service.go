@@ -92,6 +92,10 @@ func (s *IpfsService) Connect(addrStr string) error {
 	return nil
 }
 
+func (s *IpfsService) GetRepoPath() string {
+	return s.repoPath
+}
+
 func (s *IpfsService) SetupRepo(bootStr string) error {
 	fmt.Printf("setting up new repo at %s\n", s.repoPath)
 

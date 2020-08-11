@@ -41,7 +41,7 @@ func NewService() (context.CancelFunc, *IpfsService, error) {
 	return cancel, &IpfsService{ctx: ctx, repoPath: pr}, nil
 }
 
-func (s *IpfsService) StartService() error {
+func (s *IpfsService) Start() error {
 	ipfs, err := createNode(s.ctx, s.repoPath)
 	if err != nil {
 		return errors.Wrap(err, "failed to spawn default node")
@@ -193,12 +193,12 @@ func getAddrInfoFromStr(addrStr string) (*peer.AddrInfo, error) {
 func getUnixfsNode(path string) (files.Node, error) {
 	st, err := os.Stat(path)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get file info; it might not exist")
 	}
 
 	f, err := files.NewSerialFile(path, false, st)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to return file as a node")
 	}
 
 	return f, nil

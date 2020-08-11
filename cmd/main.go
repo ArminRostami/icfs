@@ -29,7 +29,7 @@ func run() error {
 		}
 	}
 
-	if err = ipfsService.StartService(); err != nil {
+	if err = ipfsService.Start(); err != nil {
 		return errors.Wrap(err, "failed to start ipfs service")
 	}
 
